@@ -67,6 +67,7 @@ class HighScores:
         for idx, score in enumerate(self.score, start=1):
             print(f"{idx}., {score['name']}- Name: {score['name']} - Score: {score['score']}, Time: {score['time_duration']}")
             
+            
  # Create an instance of the HighScores class
 high_score_instance = HighScores()
 
@@ -74,7 +75,7 @@ class Bullet:
     def __init__(self, x, y, image, angle, damage):
         self.x = x
         self.y = y
-        self.vel = 22
+        self.vel = 18
         self.image = image
         self.angle = angle
         self.damage = damage
@@ -96,16 +97,17 @@ class Player:
         self.y = y
         self.width = width
         self.height = height
-        self.vel = 17
+        self.vel = 15
         self.bullets = []
         self.shooting = False
         self.shoot_counter = 0
-        self.shoot_cooldown = 4
+        self.shoot_cooldown = 6
         self.score = 0
         self.total_damage_to_enemies = 0
         self.health = 100
         self.max_health = 100
         self.direction = "standing"
+        self.game_over = False  # New variable to track game over state
         
         
     def draw(self, win):
@@ -116,7 +118,7 @@ class Player:
         elif self.direction == "forward":
             char = pygame.image.load('assets/player_img_forward.png')
         elif self.direction == "backward":
-            char = pygame.image.load('assets/player_img_forward.png')
+            char = pygame.image.load('assets/player_img_reverse.png')
         else:
             char = pygame.image.load('assets/player_img1.png')
             
@@ -126,11 +128,11 @@ class Player:
             
     def update_direction(self, keys):
         if keys[pygame.K_w] and self.y > 0:
-            self.direction = "backward"
+            self.direction = "forward"
         elif keys[pygame.K_a] and self.x > 0:
             self.direction = "left"
         elif keys[pygame.K_s] and self.y < win_height - self.height:
-            self.direction = "forward"
+            self.direction = "backward"
         elif keys[pygame.K_d] and self.x < win_width - self.width:
             self.direction = "right"
         else:
@@ -138,10 +140,10 @@ class Player:
 
     def shoot(self, bullet_img):
         if self.shoot_counter == 0:
-            bullet1 = Bullet(self.x - 0.05 * self.width, self.y - 45, bullet_sides, -90, 0.7)
-            bullet2 = Bullet(self.x + .20 * self.width, self.y - 10, bullet_middle, -90, 1.5)
-            bullet3 = Bullet(self.x + .35 * self.width, self.y - 10, bullet_middle, -90, 1.5)
-            bullet4 = Bullet(self.x + .40 * self.width, self.y - 45, bullet_sides, -90, 0.7)
+            bullet1 = Bullet(self.x + .29 * self.width, self.y + 40, bullet_sides, -90, 0.7)
+            bullet2 = Bullet(self.x + .45 * self.width, self.y + 58, bullet_middle, -90, 1.5)
+            bullet3 = Bullet(self.x + .62 * self.width, self.y + 58, bullet_middle, -90, 1.5)
+            bullet4 = Bullet(self.x + .69 * self.width, self.y + 40, bullet_sides, -90, 0.7)
 
             self.bullets.extend([bullet1, bullet2, bullet3, bullet4])
             self.shoot_counter = self.shoot_cooldown
@@ -165,93 +167,103 @@ class Player:
       
 
         if self.health <= 0:
-            self.display_game_over(game_over_bg)
+            self.health = 0
+            self.display_game_over()
+            
+    
 
-    def display_game_over(self, game_over_bg):
+    def display_game_over(self):
+        game_over_bg = pygame.image.load('assets/gameover.png')
+        win.blit(game_over_bg, (0, 0))
+
         # Display the player's score and time from the prior round
         current_time = pygame.time.get_ticks() - start_time
         minutes = current_time // 60000
         seconds = (current_time // 1000) % 60
         milliseconds = current_time % 1000
-        
-        if game_over_bg is not None:
-            win.blit(game_over_bg, (0, 0))
-        
-        
-        input_text = FONT.render("", True, (255, 255, 255))  # Define the input_text variable before the while loop
 
-        # Display the player's score and time from the prior round
-        score_text = stats_font.render(f"{self.score}", True, (255, 255, 255))
-        time_text = stats_font.render(f"{minutes:02}:{seconds:02}:{milliseconds:02}", True, (255, 255, 255))
-        win.blit(score_text, (win_width // 2 - time_text.get_width() // 2 + 100, win_height // 2 - 310))
-        win.blit(time_text, (win_width // 2 - time_text.get_width() // 2 + 350, win_height // 2 - 310))
+        score_text = stats_font.render(f"Score: {self.score}", True, (255, 255, 255))
+        time_text = stats_font.render(f"Time: {minutes:02}:{seconds:02}:{milliseconds:02}", True, (255, 255, 255))
+        win.blit(score_text, (win_width // 2 - score_text.get_width() // 2, win_height // 2 - 50))
+        win.blit(time_text, (win_width // 2 - time_text.get_width() // 2, win_height // 2 + 20))
 
-
-        # # Ask the player to enter their name
-        player_name = ""
-        name_prompt_text = FONT.render(f"{player_name}", 1, "white")
-        win.blit(name_prompt_text, (185, 200))
-        
-        # Call the display_scores method on the HighScores instance
-        high_score_instance.display_score()
-        
-        clock.tick(60)
         pygame.display.flip()
 
-        entering_name = True
+        run = True  # Add this line to set 'run' to True initially
 
-        while entering_name:
+        while run:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
-                        entering_name = False
-                    elif event.key == pygame.K_BACKSPACE:
-                        player_name = player_name[:-1]
-                    elif event.unicode.isalpha() or event.unicode.isdigit() or event.unicode.isspace():
-                        player_name += event.unicode
-                        
-                # Clear the input area with a solid color
-                pygame.draw.rect(win, (0, 0, 0), (win_width // 2 - input_text.get_width() // 2, win_height // 4 - 50, input_text.get_width(), input_text.get_height()))
+                        run = False  # Set 'run' to False to exit the loop
+                        restart_game(self)  # Call the restart_game function with the player instance
 
-                input_text = FONT.render(player_name, True, (255, 255, 255))
-                win.blit(input_text, (win_width // 2 - input_text.get_width() // 2, win_height // 4 - 20))
-                clock.tick(60)
+            clock.tick(60)
 
-                pygame.display.update()
+def restart_game(player):
+    player.game_over = False
+    player.health = 100
+    player.score = 0
+    player.vel = 17
+    player.bullets = []
+    player.shooting = False
+    player.shoot_counter = 0
+    player.shoot_cooldown = 4
+    player.score = 0
+    player.total_damage_to_enemies = 0
+    player.health = 100
+    player.max_health = 100
+    player.direction = "standing"
 
-            # Add the player's score to the high scores
-            high_score_instance.add_score(player_name, self.score, f"{minutes:02}:{seconds:02}:{milliseconds:02}")
+    # Clear the input area with a solid color
+    pygame.draw.rect(win, (0, 0, 0), (win_width // 2 - input_text.get_width() // 2, win_height // 4 - 50, input_text.get_width(), input_text.get_height()))
+
+    input_text = FONT.render(player_name, True, (255, 255, 255))
+    win.blit(input_text, (win_width // 2 - input_text.get_width() // 2, win_height // 4 - 20))
+
+    clock.tick(60)
+    pygame.display.update()
+
+    # Add the player's score to the high scores only when health reaches 0
+    high_score_instance.add_score(player_name, player.score, f"{minutes:02}:{seconds:02}:{milliseconds:02}")
+
+
+    
+    
+
+    # Define a starting x-coordinate for the leftmost column
+    start_x = win_width // 2 - 100  # Adjust this value as needed
+    start_y = 50  # Adjust this value as needed
+
+    for idx, score in enumerate(high_score_instance.score[:1], start=1):
+        score_text = leaderboard_font.render(f"{idx}. {score['name']}", True, (255, 255, 255))
+        score_value_text = leaderboard_font.render(f"Score: {score['score']}", True, (255, 255, 255))
+        time_value_text = leaderboard_font.render(f"Time: {score['time_duration']}", True, (255, 255, 255))
         
-            # Draw the top 20 high scores on the screen
-            font = pygame.font.Font(None, 36)
-            text_y = win_height // 2 - 200  # Adjust the vertical position of the high scores
-
-            # Display the top 20 high scores
-            high_score_instance.display_score()
+        # Calculate the y-coordinate for the current row
+        row_y = start_y + (idx - 1) * 70  # Adjust the vertical spacing between rows
         
-            # Define a starting x-coordinate for the leftmost column
-            start_x = win_width // 2 - 100  # Adjust this value as needed
-            start_y = 50  # Adjust this value as needed
+        win.blit(score_text, (start_x, row_y))
+        win.blit(score_value_text, (start_x + 50, row_y)) 
+        win.blit(time_value_text, (start_x + 300, row_y))
+    
+    while run:  # Add this line to introduce 'run' in the scope of the restart_game method
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    self.game_over = False
+                    run = False  # Set 'run' to False to exit the loop and continue the game
 
-            for idx, score in enumerate(high_score_instance.score[:10], start=1):
-                score_text = leaderboard_font.render(f"{idx}. {score['name']}", True, (255, 255, 255))
-                score_value_text = leaderboard_font.render(f"Score: {score['score']}", True, (255, 255, 255))
-                time_value_text = leaderboard_font.render(f"Time: {score['time_duration']}", True, (255, 255, 255))
-                
-                # Calculate the y-coordinate for the current row
-                row_y = start_y + (idx - 1) * 70  # Adjust the vertical spacing between rows
-                
-                win.blit(score_text, (start_x, row_y))
-                win.blit(score_value_text, (start_x + 50, row_y))  # Adjust the horizontal spacing between columns
-                win.blit(time_value_text, (start_x + 300, row_y))  # Adjust the horizontal spacing between columns
-        clock.tick(60)
-        pygame.display.flip()
+    clock.tick(60)     
 
-        pygame.quit()
-        sys.exit()
+    pygame.quit()
+    sys.exit()
 
 class Enemy:
     def __init__(self, x, y, width, height, bullet_image, player):
@@ -259,14 +271,14 @@ class Enemy:
         self.y = y
         self.width = width
         self.height = height
-        self.vel = 7
+        self.vel = 3
         self.bullets = []
         self.bullet_image = bullet_image
         self.shoot_counter = 0
         self.shoot_cooldown = 10
         self.player = player
-        self.health = 50
-        self.max_health = 50
+        self.health = 25
+        self.max_health = 25
         self.reverse_timer = 0
         self.reverse_delay = 800000
         self.reverse_direction = False
@@ -444,7 +456,7 @@ def welcome_screen():
     # Load animated background images
     background_animation = [pygame.image.load(f'backgrounds/landing/{i}.png') for i in range(1, 134)]
     current_frame = 0
-    animation_speed = 60  # Adjust the speed of the animation
+    animation_speed = 80  # Adjust the speed of the animation
 
     background_animation2 = [pygame.image.load(f'backgrounds/title_header/{i}.png') for i in range(1, 31)]
     current_frame_bg2 = 0
@@ -501,7 +513,7 @@ explosion_animations = []  # List to store explosion animations
 # Call the welcome_screen function before entering the main game loop
 if welcome_screen():
     # Main loop
-    player_1 = Player(100, 100, 100, 100)
+    player_1 = Player(win_width // 2 - player_width // 2, win_height - player_width - 150, 100, 100)
     background = ScrollingBackground(background_images)
     enemies = []
     enemy_spawner = EnemySpawner(cooldown=150)
@@ -510,7 +522,6 @@ if welcome_screen():
     run = True
     while run:
         entering_name = False
-        clock.tick(60)
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -631,13 +642,13 @@ if welcome_screen():
                         else:
                             player_name += event.unicode
             
-            pygame.display.update()
-            clock.tick(30)
+           
+            clock.tick(60)
             
         
         update_and_display_stats(player_1)
         pygame.display.update()
         redraw_game_window(player_1, enemies, background)
-
+        
 pygame.quit()
 sys.exit()
