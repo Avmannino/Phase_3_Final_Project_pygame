@@ -17,6 +17,8 @@ start_button = pygame.image.load('assets/start_button.png')
 exit_button = pygame.image.load('assets/exit_button.png')
 health_bar_image = pygame.image.load('assets/health_bar.png').convert_alpha()
 game_over_bg = pygame.image.load('assets/gameover.png')
+restart_button = pygame.image.load('assets/restart_button.png')  # Adjust path as needed
+
 
 player_width = 75
 player_health = 100
@@ -26,7 +28,7 @@ health_bar_height = 20
 FONT = pygame.font.SysFont(None, 45)
 game_over_font = pygame.font.SysFont(None, 95)
 leaderboard_font = pygame.font.SysFont(None, 50)
-stats_font = pygame.font.SysFont(None, 55)
+stats_font = pygame.font.SysFont(None, 65)
 
 
 
@@ -42,7 +44,7 @@ clock = pygame.time.Clock()
 # Class definition for HighScores
 class HighScores:
     def __init__(self):
-        self.score = []
+        self.scores = []
         self.load_scores()
 
     def load_scores(self):
@@ -50,25 +52,30 @@ class HighScores:
             with open('hi_scores.txt', 'r') as file:
                 for line in file:
                     name, score, time_duration = line.strip().split(',')
-                    self.score.append({'name': name, 'score': int(score), 'time_duration': time_duration})
+                    self.scores.append({'name': name, 'score': int(score), 'time_duration': time_duration})
 
     def save_scores(self):
         with open('hi_scores.txt', 'w') as file:
-            for score in self.score:
+            for score in self.scores:
                 file.write(f"{score['name']},{score['score']},{score['time_duration']}\n")
 
     def add_score(self, name, score, time_duration):
-        self.score.append({'name': name, 'score': score, 'time_duration': time_duration})
-        self.score = sorted(self.score, key=lambda x: x['score'], reverse=True)[:20]  # Keep only top 20 scores
-        self.save_scores()
+        if not self.scores or score > self.scores[0]['score']:
+            self.scores = [{'name': name, 'score': score, 'time_duration': time_duration}]
+            self.save_scores()  # Save the new highest score
 
-    def display_score(self):
+    def get_highest_score(self):
+        if self.scores:
+            return max(score['score'] for score in self.scores)
+        else:
+            return 0
+
+    def display_scores(self):
         print("\nHIGH SCORES:")
-        for idx, score in enumerate(self.score, start=1):
+        for idx, score in enumerate(self.scores, start=1):
             print(f"{idx}., {score['name']}- Name: {score['name']} - Score: {score['score']}, Time: {score['time_duration']}")
+
             
-            
- # Create an instance of the HighScores class
 high_score_instance = HighScores()
 
 class Bullet:
@@ -164,42 +171,104 @@ class Player:
         
     def take_damage(self, damage):
         self.health -= damage
-      
-
         if self.health <= 0:
             self.health = 0
             self.display_game_over()
+            self.game_over = True  # Ensuring game over is set to True
+            # Ensure high score is recorded when health drops to zero
+            current_time = pygame.time.get_ticks() - start_time
+            minutes = current_time // 60000
+            seconds = (current_time // 1000) % 60
+            milliseconds = current_time % 1000
+            high_score_instance.add_score("PlayerName", self.score, f"{minutes:02}:{seconds:02}:{milliseconds:03}")
             
-    
 
     def display_game_over(self):
-        game_over_bg = pygame.image.load('assets/gameover.png')
-        win.blit(game_over_bg, (0, 0))
+            
+            # Draw the background image
+            win.blit(game_over_bg, (0, 0))
 
-        # Display the player's score and time from the prior round
+            # Adjust the position and size of the restart button
+            restart_button_rect = pygame.Rect(win_width // 2 - 135, win_height // 2 + 280, 320, 80)
+
+            # Adjust the color and style of the restart button
+            restart_button_color = (204, 204, 0, 80)  # Red color
+            border_radius = 40  # Adjust the border radius as needed
+            pygame.draw.rect(win, restart_button_color, restart_button_rect, border_radius=border_radius)
+
+            # Render text
+            font = pygame.font.Font(None, 36) 
+            text_surface = font.render("Try Again?", True, (0, 0, 0))  
+            text_rect = text_surface.get_rect(center=restart_button_rect.center)
+
+            # Blit text onto the button surface
+            win.blit(text_surface, text_rect)
+
+            pygame.display.flip()
+
+
+            waiting_for_input = True
+            while waiting_for_input:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        pygame.quit()
+                        sys.exit()
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        if restart_button_rect.collidepoint(event.pos):
+                            # Restart the whole program
+                            python = sys.executable
+                            os.execl(python, python, *sys.argv)
+
+    def restart_game(self):
+        # Reset player state
+        self.game_over = False
+        self.health = max_player_health
+        self.score = 0
+        self.bullets = []
+        self.shooting = False
+        self.shoot_counter = 0
+        self.vel = 15
+        self.x = win_width // 2 - self.width // 2
+        self.y = win_height - self.height - 150
+
+        # Reset enemies
+        global enemies  # Assuming enemies is a global list
+        enemies.clear()
+        for _ in range(5):  # Spawn 5 new enemies, for example
+            enemy_x = random.randint(0, win_width - 100)
+            enemy_y = 0
+            enemies.append(Enemy(enemy_x, enemy_y, 100, 100, bullet_missile, self))
+
+        # Recalculate time to display
         current_time = pygame.time.get_ticks() - start_time
         minutes = current_time // 60000
         seconds = (current_time // 1000) % 60
         milliseconds = current_time % 1000
 
-        score_text = stats_font.render(f"Score: {self.score}", True, (255, 255, 255))
-        time_text = stats_font.render(f"Time: {minutes:02}:{seconds:02}:{milliseconds:02}", True, (255, 255, 255))
-        win.blit(score_text, (win_width // 2 - score_text.get_width() // 2, win_height // 2 - 50))
-        win.blit(time_text, (win_width // 2 - time_text.get_width() // 2, win_height // 2 + 20))
+        # Display time and score
+        time_text = stats_font.render(f"{minutes:02}:{seconds:02}:{milliseconds:03}", True, (255, 255, 255))
+        score_text = stats_font.render(f"Score: {self.score:,}", True, (255, 255, 255))
+        win.blit(score_text, (win_width // 2 - score_text.get_width() // 2, win_height // 2 - 100))
+        win.blit(time_text, (win_width // 2 - time_text.get_width() // 2 + 330, win_height // 2 - 100))
+
+        # Fetch and display the highest score
+        highest_score = high_score_instance.get_highest_score()
+        highest_score_text = stats_font.render(f"Highest Score: {highest_score:,}", True, (255, 255, 255))
+        win.blit(highest_score_text, (win_width // 2 - highest_score_text.get_width() // 2, win_height // 2 + 100))
 
         pygame.display.flip()
 
-        run = True  # Add this line to set 'run' to True initially
+        # Add this line to set 'run' to True initially
+        run = True
 
         while run:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-                elif event.type == pygame.KEYDOWN:
+                elif event.type is pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
                         run = False  # Set 'run' to False to exit the loop
-                        restart_game(self)  # Call the restart_game function with the player instance
 
             clock.tick(60)
 
@@ -218,6 +287,14 @@ def restart_game(player):
     player.max_health = 100
     player.direction = "standing"
 
+    # Add the player's score to the high scores only when health reaches 0
+    if player.health <= 0:
+        current_time = pygame.time.get_ticks() - start_time
+        minutes = current_time // 60000
+        seconds = (current_time // 1000) % 60
+        milliseconds = current_time % 1000
+        high_score_instance.add_score(player_name, player.score, f"{minutes:02}:{seconds:02}:{milliseconds:02}")
+
     # Clear the input area with a solid color
     pygame.draw.rect(win, (0, 0, 0), (win_width // 2 - input_text.get_width() // 2, win_height // 4 - 50, input_text.get_width(), input_text.get_height()))
 
@@ -226,13 +303,6 @@ def restart_game(player):
 
     clock.tick(60)
     pygame.display.update()
-
-    # Add the player's score to the high scores only when health reaches 0
-    high_score_instance.add_score(player_name, player.score, f"{minutes:02}:{seconds:02}:{milliseconds:02}")
-
-
-    
-    
 
     # Define a starting x-coordinate for the leftmost column
     start_x = win_width // 2 - 100  # Adjust this value as needed
@@ -250,20 +320,35 @@ def restart_game(player):
         win.blit(score_value_text, (start_x + 50, row_y)) 
         win.blit(time_value_text, (start_x + 300, row_y))
     
-    while run:  # Add this line to introduce 'run' in the scope of the restart_game method
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    self.game_over = False
-                    run = False  # Set 'run' to False to exit the loop and continue the game
+
 
     clock.tick(60)     
 
     pygame.quit()
     sys.exit()
+    
+class HealthItem:
+    def __init__(self, x, y, image):
+        self.x = 0
+        self.y = 0
+        self.image = image
+        self.width = self.image.get_width()
+        self.height = self.image.get_height()
+        self.vel = 2
+        self.active = True
+
+    def spawn(self):
+        self.x = random.randint(50, 1000 - self.width - 50)
+        self.y = random.randint(50, 1000 - self.height - 50)
+        self.active = True
+
+    def draw(self, win):
+        if self.active:
+            win.blit(self.image, (self.x, self.y))
+
+    def check_collision(self, player_rect):
+        return player_rect.colliderect(pygame.Rect(self.x, self.y, self.width, self.height))
+
 
 class Enemy:
     def __init__(self, x, y, width, height, bullet_image, player):
@@ -426,6 +511,18 @@ def draw_player_health_bar(player_width):
     text_y = win_height - 973  # Adjust the position of the health text
     win.blit(health_text, (text_x, text_y))
 
+    if player_1.health <= 0 and not player_1.game_over:  # Check if the player is not already in game over state
+        player_1.display_game_over()
+        player_1.game_over = True  # Set game over state to True
+
+        # Add the player's score to the high scores only when health reaches 0
+        current_time = pygame.time.get_ticks() - start_time
+        minutes = current_time // 60000
+        seconds = (current_time // 1000) % 60
+        milliseconds = current_time % 1000
+        high_score_instance.add_score(player_name, player_1.score, f"{minutes:02}:{seconds:02}:{milliseconds:02}")
+
+
 def update_and_display_stats(player):
     # Update and display the health bar
     draw_player_health_bar(player_width)
@@ -443,7 +540,7 @@ def update_and_display_stats(player):
     win.blit(timer_text, (win_width - 315, win_height - 973))  # Adjust the position as needed
 
     # Display the score 
-    score_text = FONT.render(f"{player.score}", True, (255, 255, 255))
+    score_text = FONT.render(f"{player.score:,}", True, (255, 255, 255))
     win.blit(score_text, (459, 34))
 
     pygame.display.update()
@@ -508,6 +605,11 @@ def welcome_screen():
 # Instantiate an EnemySpawner with a specific cooldown value
 enemy_spawner = EnemySpawner(cooldown=150)
 
+health_item_image = pygame.image.load('assets/health_item.png')
+health_item = HealthItem(win_width / 2, win_height / 2, health_item_image)
+
+
+
 explosion_animations = []  # List to store explosion animations
 
 # Call the welcome_screen function before entering the main game loop
@@ -518,6 +620,8 @@ if welcome_screen():
     enemies = []
     enemy_spawner = EnemySpawner(cooldown=150)
     start_time = pygame.time.get_ticks()  # Set the start time when the game starts
+    spawn_timer = 0
+    spawn_interval = 15000  # Time in milliseconds between spawns
 
     run = True
     while run:
@@ -571,15 +675,34 @@ if welcome_screen():
             enemy.shoot()
             enemy.move_bullets()
             enemy.cooldown()
+            
+        # Spawn the health item randomly
+        if pygame.time.get_ticks() - spawn_timer > spawn_interval:
+            health_item.spawn()
+            spawn_timer = pygame.time.get_ticks()
+            
+        # Move health items
+        health_item.y += health_item.vel
 
+        # Check collision
+        player_rect = pygame.Rect(player_1.x, player_1.y, player_1.width, player_1.height)
+        if health_item.check_collision(player_rect):
+            player_1.health = min(player_1.max_health, player_1.health + 20)
+            health_item.active = False  # Disable the health item after collision
+        
+        health_item.draw(win)
+        
         enemies_to_remove = []
         bullets_to_remove = []
+
 
         destroyed_enemy_ids = set()  # Set to store the IDs of destroyed enemies
     
         
         for explosion_animation in explosion_animations:
             explosion_animation.animate(win)
+            
+            
         
         # Inside the main loop
         for enemy in enemies:
@@ -615,6 +738,11 @@ if welcome_screen():
         # Inside the main game loop
         explosion_animations = [explosion for explosion in explosion_animations if explosion.current_frame < len(explosion.images)]
 
+     
+        player_rect = pygame.Rect(player_1.x, player_1.y, player_1.width, player_1.height)
+        if health_item.check_collision(player_rect):
+            player_1.health = min(player_1.max_health, player_1.health + 20)
+            health_item.x = -100  # Move it offscreen or respawn as needed
 
 
         player_1.score += 5000 * len(destroyed_enemy_ids)
@@ -624,6 +752,17 @@ if welcome_screen():
         player_1.bullets = [bullet for bullet in player_1.bullets if bullet not in bullets_to_remove]
         enemies = [enemy for enemy in enemies if enemy not in enemies_to_remove]
         enemies = [enemy for enemy in enemies if enemy.health > 0]
+        
+        if not run and entering_name:
+            # Display the score and time only on the game over screen
+            current_time = pygame.time.get_ticks() - start_time
+            minutes = current_time // 60000
+            seconds = (current_time // 1000) % 60
+            milliseconds = current_time % 1000
+            score_time_text = FONT.render(f"Score: {player_1.score:,}    Time: {minutes:02}:{seconds:02}:{milliseconds:03}", True, (255, 255, 255))
+            text_x = win_width // 2 - score_time_text.get_width() // 2
+            text_y = win_height // 3
+            win.blit(score_time_text, (text_x, text_y))
         
         while run and entering_name:
             entering_name = True
