@@ -35,9 +35,14 @@ stats_font = pygame.font.SysFont(None, 65)
 char = pygame.image.load('assets/player_img1.png')
 bullet_sides = pygame.image.load('assets/purple_sides.png')
 bullet_middle = pygame.image.load('assets/orange_middle.png')
-bullet_missile = pygame.image.load('assets/small_missile.png')
+bullet_missile = pygame.image.load('assets/enemy_bullet_red.png')
 
 enemy_ship = pygame.image.load('assets/enemy_ship1.png')
+boss_image = pygame.image.load('assets/boss_one.png') 
+boss_bullet = pygame.image.load('assets/boss_bullet.png') 
+
+
+
 
 clock = pygame.time.Clock()
 
@@ -78,12 +83,45 @@ class HighScores:
             
 high_score_instance = HighScores()
 
+class ScrollingBackground:
+    def __init__(self, images):
+        self.images = images
+        self.current_index = 0
+        self.scroll_speed = 1.8
+        self.y = 0
+
+    def scroll(self):
+        self.y += self.scroll_speed
+        if self.y >= win_height:
+            self.y = 0
+            self.current_index = (self.current_index + 1) % len(self.images)
+
+    def draw(self, win):
+        win.blit(self.images[self.current_index], (0, self.y))
+        win.blit(self.images[(self.current_index + 1) % len(self.images)], (0, self.y - win_height))
+
+def redraw_game_window(player, enemies, background):
+    background.draw(win)
+    player.draw(win)
+    for enemy in enemies:
+        enemy.draw(win)
+
+    # Display the stats bar image at the top center
+    stats_bar_image = pygame.image.load('assets/stats_bar.png') 
+    stats_bar_rect = stats_bar_image.get_rect(center=(win_width // 2, 40))
+    win.blit(stats_bar_image, stats_bar_rect)
+
 class Bullet:
     def __init__(self, x, y, image, angle, damage):
         self.x = x
         self.y = y
         self.vel = 18
-        self.image = image
+        if isinstance(image, str):
+            self.image = pygame.image.load(image).convert_alpha()
+        elif isinstance(image, pygame.Surface):
+            self.image = image
+        else:
+            raise TypeError("Image must be a file path or pygame.Surface")
         self.angle = angle
         self.damage = damage
 
@@ -94,9 +132,16 @@ class Bullet:
         radian_angle = math.radians(self.angle)
         self.x += self.vel * math.cos(radian_angle)
         self.y += self.vel * math.sin(radian_angle)
-        
+
     def get_rect(self):
-        return pygame.Rect(self.x, self.y, self.image.get_width(), self.image.get_height())    
+        return pygame.Rect(self.x, self.y, self.image.get_width(), self.image.get_height())
+
+    def collide(self, target):
+        bullet_rect = self.get_rect()
+        target_rect = pygame.Rect(target.x, target.y, target.width, target.height)
+        return bullet_rect.colliderect(target_rect)
+
+
 
 class Player:
     def __init__(self, x, y, width, height):
@@ -219,58 +264,6 @@ class Player:
                             python = sys.executable
                             os.execl(python, python, *sys.argv)
 
-    def restart_game(self):
-        # Reset player state
-        self.game_over = False
-        self.health = max_player_health
-        self.score = 0
-        self.bullets = []
-        self.shooting = False
-        self.shoot_counter = 0
-        self.vel = 15
-        self.x = win_width // 2 - self.width // 2
-        self.y = win_height - self.height - 150
-
-        # Reset enemies
-        global enemies  # Assuming enemies is a global list
-        enemies.clear()
-        for _ in range(5):  # Spawn 5 new enemies, for example
-            enemy_x = random.randint(0, win_width - 100)
-            enemy_y = 0
-            enemies.append(Enemy(enemy_x, enemy_y, 100, 100, bullet_missile, self))
-
-        # Recalculate time to display
-        current_time = pygame.time.get_ticks() - start_time
-        minutes = current_time // 60000
-        seconds = (current_time // 1000) % 60
-        milliseconds = current_time % 1000
-
-        # Display time and score
-        time_text = stats_font.render(f"{minutes:02}:{seconds:02}:{milliseconds:03}", True, (255, 255, 255))
-        score_text = stats_font.render(f"Score: {self.score:,}", True, (255, 255, 255))
-        win.blit(score_text, (win_width // 2 - score_text.get_width() // 2, win_height // 2 - 100))
-        win.blit(time_text, (win_width // 2 - time_text.get_width() // 2 + 330, win_height // 2 - 100))
-
-        # Fetch and display the highest score
-        highest_score = high_score_instance.get_highest_score()
-        highest_score_text = stats_font.render(f"Highest Score: {highest_score:,}", True, (255, 255, 255))
-        win.blit(highest_score_text, (win_width // 2 - highest_score_text.get_width() // 2, win_height // 2 + 100))
-
-        pygame.display.flip()
-
-        # Add this line to set 'run' to True initially
-        run = True
-
-        while run:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-                elif event.type is pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN:
-                        run = False  # Set 'run' to False to exit the loop
-
-            clock.tick(60)
 
 def restart_game(player):
     player.game_over = False
@@ -424,46 +417,111 @@ class Enemy:
             self.health = 0
             return True
         return False
+    
+class Boss:
+    def __init__(self, x, y, boss_bullet, target):
+        self.x = x
+        self.y = y
+        self.width = 115  # Set width to 125
+        self.height = 115  # Set height to 125
+        self.boss_image = pygame.transform.scale(pygame.image.load('assets/boss_one.png'), (self.width, self.height))
+        self.vel = 5
+        self.health = 250
+        self.max_health = 250
+        self.bullet_img = boss_bullet
+        self.target = target
+        self.bullet_vel = 5
+        self.shoot_cooldown = 200
+        self.shoot_timer = pygame.time.get_ticks()
+        self.bullets = []
+        self.moving_right = True
+
+    def draw_health_bar(self, win):
+        # Calculate health bar width based on current health
+        health_bar_width = int((self.health / self.max_health) * self.width)
+        health_bar_height = 20
+        # Draw the health bar just above the boss
+        pygame.draw.rect(win, (255, 0, 0), (self.x, self.y - 20, self.width, health_bar_height))
+        pygame.draw.rect(win, (0, 255, 0), (self.x, self.y - 20, health_bar_width, health_bar_height))
+        
+    def move(self):
+        if self.moving_right:
+            self.x += self.vel
+            if self.x + self.width > win_width:  # Boss reaches right edge
+                self.moving_right = False
+        else:
+            self.x -= self.vel
+            if self.x < 0:  # Boss reaches left edge
+                self.moving_right = True
+
+    def shoot(self):
+        current_time = pygame.time.get_ticks()
+        if current_time - self.shoot_timer > self.shoot_cooldown:
+            # Calculate bullet trajectory towards the player
+            vel_x = (self.target.x + self.target.width / 2) - (self.x + self.width / 2)
+            vel_y = (self.target.y + self.target.height / 2) - (self.y + self.height / 2)
+            magnitude = math.sqrt(vel_x**2 + vel_y**2)
+            if magnitude != 0:
+                vel_x = (vel_x / magnitude) * self.bullet_vel
+                vel_y = (vel_y / magnitude) * self.bullet_vel
+            
+            # Calculate angle for the bullet
+            angle = math.degrees(math.atan2(vel_y, vel_x))
+            
+            # Create a new bullet
+            new_bullet = Bullet(self.x + self.width / 2, self.y + self.height / 2, self.bullet_img, angle, self.bullet_vel)
+            self.bullets.append(new_bullet)
+            self.shoot_timer = current_time
+            
+    def get_rect(self):
+        return pygame.Rect(self.x, self.y, self.width, self.height)
+
+
+
+    def move_bullets(self):
+        for bullet in list(self.bullets):  # Use list to safely remove items while iterating
+            bullet.move()
+            if bullet.collide(self.target):
+                self.target.take_damage(bullet.damage)
+                self.bullets.remove(bullet)
+
+    def update(self):
+        self.move_bullets()
+        self.move()
+
+    def take_damage(self, damage):
+        self.health -= damage
+        if self.health <= 0:
+            # Boss defeated, implement defeat logic here
+            pass
+
+    def draw(self, win):
+        win.blit(self.boss_image, (self.x, self.y))
+        self.draw_health_bar(win)
+
+        
+        
 
 class EnemySpawner:
     def __init__(self, cooldown):
         self.cooldown = cooldown
         self.counter = 0
+        self.boss_defeated = False
 
     def spawn_enemy(self):
+        if self.boss_defeated:
+            return False
+
         self.counter += 1
         if self.counter >= self.cooldown:
             self.counter = 0
             return True
         return False
 
-class ScrollingBackground:
-    def __init__(self, images):
-        self.images = images
-        self.current_index = 0
-        self.scroll_speed = 1.8
-        self.y = 0
+    def boss_is_defeated(self):
+        self.boss_defeated = True
 
-    def scroll(self):
-        self.y += self.scroll_speed
-        if self.y >= win_height:
-            self.y = 0
-            self.current_index = (self.current_index + 1) % len(self.images)
 
-    def draw(self, win):
-        win.blit(self.images[self.current_index], (0, self.y))
-        win.blit(self.images[(self.current_index + 1) % len(self.images)], (0, self.y - win_height))
-
-def redraw_game_window(player, enemies, background):
-    background.draw(win)
-    player.draw(win)
-    for enemy in enemies:
-        enemy.draw(win)
-
-    # Display the stats bar image at the top center
-    stats_bar_image = pygame.image.load('assets/stats_bar.png') 
-    stats_bar_rect = stats_bar_image.get_rect(center=(win_width // 2, 40))
-    win.blit(stats_bar_image, stats_bar_rect)
 
 class ExplosionAnimation:
     def __init__(self, x, y):
@@ -559,6 +617,7 @@ def welcome_screen():
     current_frame_bg2 = 0
     loop_counter_bg2 = 0
     first_loop_completed = False  # Variable to track the first loop of background_animation2
+    
 
     while True:
         entering_name = True
@@ -610,6 +669,8 @@ health_item = HealthItem(win_width / 2, win_height / 2, health_item_image)
 
 
 
+
+
 explosion_animations = []  # List to store explosion animations
 
 # Call the welcome_screen function before entering the main game loop
@@ -622,6 +683,9 @@ if welcome_screen():
     start_time = pygame.time.get_ticks()  # Set the start time when the game starts
     spawn_timer = 0
     spawn_interval = 15000  # Time in milliseconds between spawns
+    
+    # Initialize boss_spawned
+    boss_spawned = False
 
     run = True
     while run:
@@ -663,23 +727,48 @@ if welcome_screen():
 
         background.scroll()
 
-        if enemy_spawner.spawn_enemy():
+        # Handle enemy spawning
+        if enemy_spawner.spawn_enemy() and player_1.score < 10000:  # Keep spawning regular enemies until score reaches 10,000
             enemy_x = random.randint(0, win_width - 100)
             enemy_y = 0
             new_enemy = Enemy(enemy_x, enemy_y, 100, 100, bullet_missile, player_1)
             enemies.append(new_enemy)
 
+        # Handle boss spawning
+        if player_1.score >= 10000 and not boss_spawned and not enemy_spawner.boss_defeated:
+            # Calculate the boss's starting position so it appears centered
+            # Calculate the initial x-coordinate to center the boss
+            boss_x = win_width // 2 - 62.5  # Half of the boss width
+            boss_y = 50  # Arbitrary y-coordinate for spawning
+
+            # Create the boss instance
+            boss = Boss(boss_x, boss_y, boss_bullet, player_1)
+            boss_spawned = True
+            
+        if boss_spawned:
+            boss_rect = pygame.Rect(boss.x, boss.y, boss.width, boss.height)  # Create a rectangle for the boss
+            
+            for bullet in list(player_1.bullets):  # Use a list copy to safely modify the bullets list
+                if bullet.get_rect().colliderect(boss.get_rect()):
+                    boss.take_damage(bullet.damage)  # Assume this method deducts health from the boss
+                    player_1.bullets.remove(bullet)  # Remove the bullet on collision
+                        
+            boss.move()
+            boss.shoot()
+            boss.move_bullets()
+            boss.draw(win)
+            
+            if boss.health <= 0:  # Moved the condition inside the boss_spawned block
+                print("Boss defeated!")
+                boss_spawned = False
+                boss = None  # Cleanup the boss object
+                enemy_spawner.boss_is_defeated()  # Set boss as defeated, preventing it from respawning
+
         for enemy in enemies:
             enemy.move()
-            enemy.update()
             enemy.shoot()
             enemy.move_bullets()
             enemy.cooldown()
-            
-        # Spawn the health item randomly
-        if pygame.time.get_ticks() - spawn_timer > spawn_interval:
-            health_item.spawn()
-            spawn_timer = pygame.time.get_ticks()
             
         # Move health items
         health_item.y += health_item.vel
@@ -701,6 +790,8 @@ if welcome_screen():
         
         for explosion_animation in explosion_animations:
             explosion_animation.animate(win)
+            
+        player_1.draw(win)
             
             
         
@@ -748,6 +839,8 @@ if welcome_screen():
         player_1.score += 5000 * len(destroyed_enemy_ids)
 
         draw_player_health_bar(player_width)
+        
+
 
         player_1.bullets = [bullet for bullet in player_1.bullets if bullet not in bullets_to_remove]
         enemies = [enemy for enemy in enemies if enemy not in enemies_to_remove]
