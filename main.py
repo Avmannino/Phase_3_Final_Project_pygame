@@ -152,10 +152,10 @@ class Player:
 
     def shoot(self, bullet_img):
         if self.shoot_counter == 0:
-            bullet1 = Bullet(self.x + .29 * self.width, self.y + 40, bullet_sides, -90, 1.75)
+            bullet1 = Bullet(self.x + .29 * self.width, self.y + 40, bullet_sides, -90, .75)
             bullet2 = Bullet(self.x + .45 * self.width, self.y + 58, bullet_middle, -90, 1.5)
             bullet3 = Bullet(self.x + .62 * self.width, self.y + 58, bullet_middle, -90, 1.5)
-            bullet4 = Bullet(self.x + .69 * self.width, self.y + 40, bullet_sides, -90, 1.75)
+            bullet4 = Bullet(self.x + .69 * self.width, self.y + 40, bullet_sides, -90, .75)
 
             self.bullets.extend([bullet1, bullet2, bullet3, bullet4])
             self.shoot_counter = self.shoot_cooldown
