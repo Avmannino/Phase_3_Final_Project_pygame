@@ -17,6 +17,7 @@ start_button = pygame.image.load('assets/start_button.png')
 exit_button = pygame.image.load('assets/exit_button.png')
 health_bar_image = pygame.image.load('assets/health_bar.png').convert_alpha()
 game_over_bg = pygame.image.load('assets/gameover.png')
+victory_bg = pygame.image.load('assets/victory_bg.png')
 restart_button = pygame.image.load('assets/restart_button.png')  # Adjust path as needed
 
 player_width = 75
@@ -146,10 +147,10 @@ class Player:
 
     def shoot(self, bullet_img):
         if self.shoot_counter == 0:
-            bullet1 = Bullet(self.x + .29 * self.width, self.y + 40, bullet_sides, -90, 0.7)
+            bullet1 = Bullet(self.x + .29 * self.width, self.y + 40, bullet_sides, -90, 0.9)
             bullet2 = Bullet(self.x + .45 * self.width, self.y + 58, bullet_middle, -90, 1.5)
             bullet3 = Bullet(self.x + .62 * self.width, self.y + 58, bullet_middle, -90, 1.5)
-            bullet4 = Bullet(self.x + .69 * self.width, self.y + 40, bullet_sides, -90, 0.7)
+            bullet4 = Bullet(self.x + .69 * self.width, self.y + 40, bullet_sides, -90, 0.9)
 
             self.bullets.extend([bullet1, bullet2, bullet3, bullet4])
             self.shoot_counter = self.shoot_cooldown
@@ -227,27 +228,62 @@ def restart_game(player):
     pygame.quit()
     sys.exit()
     
+def display_victory_screen():
+    win.blit(victory_bg, (0, 0))  # Assuming you have a victory background image
+    # Adjust the position and size of the restart button
+    restart_button_rect = pygame.Rect(win_width // 2 - 135, win_height // 2 + 280, 320, 80)
+    restart_button_color = (204, 204, 0, 80)  
+    border_radius = 40  
+    pygame.draw.rect(win, restart_button_color, restart_button_rect, border_radius=border_radius)
+
+    font = pygame.font.Font(None, 36) 
+    text_surface = font.render("Play Again?", True, (0, 0, 0))  
+    text_rect = text_surface.get_rect(center=restart_button_rect.center)
+
+    win.blit(text_surface, text_rect)
+
+    pygame.display.flip()
+
+    waiting_for_input = True
+    while waiting_for_input:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if restart_button_rect.collidepoint(event.pos):
+                    # Restart the whole program
+                    python = sys.executable
+                    os.execl(python, python, *sys.argv)
+
+    
 class HealthItem:
     def __init__(self, x, y, image):
-        self.x = 0
-        self.y = 0
+        self.x = x  # Initial x position
+        self.y = y  # Initial y position
         self.image = image
         self.width = self.image.get_width()
         self.height = self.image.get_height()
         self.vel = 3
-        self.active = True
+        self.active = False  # Start as inactive and activate on spawn
 
     def spawn(self):
-        self.x = random.randint(50, 1000 - self.width - 50)
-        self.y = random.randint(50, 1000 - self.height - 50)
-        self.active = True
+        # Randomly place the health item within the bounds, considering its size
+        self.x = random.randint(50, win_width - self.width - 50)
+        self.y = random.randint(50, win_height - self.height - 50)
+        self.active = True  # Activate the health item
 
     def draw(self, win):
-        if self.active:
+        if self.active:  # Only draw if active
             win.blit(self.image, (self.x, self.y))
 
     def check_collision(self, player_rect):
-        return player_rect.colliderect(pygame.Rect(self.x, self.y, self.width, self.height))
+        # Only check for collision if the item is active
+        if self.active and player_rect.colliderect(pygame.Rect(self.x, self.y, self.width, self.height)):
+            self.active = False  # Deactivate after collision
+            return True
+        return False
+
 
 class Enemy:
     def __init__(self, x, y, width, height, bullet_image, player):
@@ -329,16 +365,19 @@ class Boss:
         self.width = 115  
         self.height = 115  
         self.boss_image = pygame.transform.scale(pygame.image.load('assets/boss_one.png'), (self.width, self.height))
-        self.vel = 5
+        self.vel = 4.5
         self.health = 250
         self.max_health = 250
         self.bullet_img = boss_bullet
         self.target = target
         self.bullet_vel = 5
-        self.shoot_cooldown = 200
+        self.shoot_cooldown = 1000  
         self.shoot_timer = pygame.time.get_ticks()
         self.bullets = []
         self.moving_right = True
+        self.font = pygame.font.SysFont(None, 25)  # Initialize font for health text
+        self.explosion_animations = []  # List to store explosion animations
+
 
     def draw_health_bar(self, win):
         health_bar_width = int((self.health / self.max_health) * self.width)
@@ -347,6 +386,11 @@ class Boss:
         # Draw the health bar just above the boss
         pygame.draw.rect(win, (255, 0, 0), (self.x, self.y - 20, self.width, health_bar_height))
         pygame.draw.rect(win, (0, 255, 0), (self.x, self.y - 20, health_bar_width, health_bar_height))
+        health_text = self.font.render(f"{int(self.health)}/{int(self.max_health)}", True, (0, 0, 0))
+        health_text_rect = health_text.get_rect(center=(self.x + self.width // 2, self.y - 10))
+        
+        # Draw the health text
+        win.blit(health_text, health_text_rect)
         
     def move(self):
         if self.moving_right:
@@ -361,19 +405,8 @@ class Boss:
     def shoot(self):
         current_time = pygame.time.get_ticks()
         if current_time - self.shoot_timer > self.shoot_cooldown:
-            # Calculate bullet trajectory towards the player
-            vel_x = (self.target.x + self.target.width / 2) - (self.x + self.width / 2)
-            vel_y = (self.target.y + self.target.height / 2) - (self.y + self.height / 2)
-            magnitude = math.sqrt(vel_x**2 + vel_y**2)
-            if magnitude != 0:
-                vel_x = (vel_x / magnitude) * self.bullet_vel
-                vel_y = (vel_y / magnitude) * self.bullet_vel
-            
-            # Calculate angle for the bullet
-            angle = math.degrees(math.atan2(vel_y, vel_x))
-            
-            # Create a new bullet
-            new_bullet = Bullet(self.x + self.width / 2, self.y + self.height / 2, self.bullet_img, angle, self.bullet_vel)
+            angle = math.atan2(self.target.y - self.y, self.target.x - self.x)
+            new_bullet = Bullet(self.x + self.width // 2, self.y + self.height, self.bullet_img, math.degrees(angle), 10)
             self.bullets.append(new_bullet)
             self.shoot_timer = current_time
             
@@ -386,22 +419,31 @@ class Boss:
             if bullet.collide(self.target):
                 self.target.take_damage(bullet.damage)
                 self.bullets.remove(bullet)
+            elif bullet.y < 0 or bullet.x < 0 or bullet.x > win_width or bullet.y > win_height:
+                self.bullets.remove(bullet)
 
     def update(self):
         self.move_bullets()
         self.move()
+        self.shoot()
 
     def take_damage(self, damage):
         self.health -= damage
         if self.health <= 0:
-            pass
+            self.health = 0
+            self.explosion_animations.append(ExplosionAnimation(self.x, self.y))
+            return True
+        return False
 
     def draw(self, win):
         win.blit(self.boss_image, (self.x, self.y))
         self.draw_health_bar(win)
+        for bullet in self.bullets:
+            bullet.draw(win)
+        for explosion in self.explosion_animations:
+            explosion.animate(win)
 
 class EnemySpawner:
-    
     def __init__(self, cooldown):
         self.cooldown = cooldown
         self.counter = 0
@@ -465,7 +507,7 @@ def draw_player_health_bar(player_width):
 
     if player_1.health <= 0 and not player_1.game_over:  # Check if the player is not already in game over state
         player_1.display_game_over()
-        player_1.game_over = True  # Set game over state to Tru
+        player_1.game_over = True  # Set game over state to True
 
 def update_and_display_stats(player):
     # Update and display the health bar
@@ -497,12 +539,12 @@ def welcome_screen():
     # Load animated background images
     background_animation = [pygame.image.load(f'backgrounds/landing/{i}.png') for i in range(1, 134)]
     current_frame = 0
-    animation_speed = 80  # Adjust the speed of the animation
+    animation_speed = 80  
 
     background_animation2 = [pygame.image.load(f'backgrounds/title_header/{i}.png') for i in range(1, 31)]
     current_frame_bg2 = 0
     loop_counter_bg2 = 0
-    first_loop_completed = False  # Variable to track the first loop of background_animation2
+    first_loop_completed = False  
     
     while True:
         entering_name = True
@@ -511,9 +553,9 @@ def welcome_screen():
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-                if start_button_rect.collidepoint(event.pos):  # Check if the mouse is over the start button
-                    start_time = pygame.time.get_ticks()  # Set the start time when the game starts
-                    return True  # Return True to indicate that the game should start
+                if start_button_rect.collidepoint(event.pos):  
+                    start_time = pygame.time.get_ticks()  
+                    return True 
              
         win.blit(background_animation[current_frame], (0, 0))
 
@@ -534,7 +576,7 @@ def welcome_screen():
             loop_counter_bg2 = 0  
             first_loop_completed = True  
 
-        # Draw the start button
+     
         button_rect = start_button.get_rect(center=(win_width // 2, win_height // 1.9))
         win.blit(start_button, button_rect)
         
@@ -547,9 +589,7 @@ enemy_spawner = EnemySpawner(cooldown=150)
 health_item_image = pygame.image.load('assets/health_item.png')
 health_item = HealthItem(win_width / 2, win_height / 2, health_item_image)
 
-explosion_animations = []  # List to store explosion animations
-
-# Call the welcome_screen function before entering the main game loop
+explosion_animations = [] 
 
 if welcome_screen():
     # Main loop
@@ -563,10 +603,10 @@ if welcome_screen():
     health_item_spawn_timer = 0
     health_item_spawn_interval = 10000  # 10 seconds interval
 
-    
-    # Initialize boss_spawned
     boss_spawned = False
-
+    boss_defeated_time = None  # Initialize boss defeated time
+    clock = pygame.time.Clock()
+    fps = 60 
     run = True
     while run:
         entering_name = False
@@ -616,47 +656,57 @@ if welcome_screen():
             
         current_time = pygame.time.get_ticks()
 
+        # Draw and check collision if the health item is active
+        current_time = pygame.time.get_ticks()
+        
         # Handle HealthItem spawning
-        if current_time - health_item_spawn_timer > health_item_spawn_interval:
-            if not health_item.active:  # Check if there is no active health item
-                health_item.spawn()  # Spawn the health item
-                health_item_spawn_timer = current_time  # Reset the timer
-
+        if not health_item.active and current_time - health_item_spawn_timer > health_item_spawn_interval:
+            health_item.spawn()
+            health_item_spawn_timer = current_time  # Reset the timer after spawning
+        
+        if health_item.active:
+            health_item.draw(win)
+            player_rect = pygame.Rect(player_1.x, player_1.y, player_1.width, player_1.height)
+            if health_item.check_collision(player_rect):
+                player_1.health = min(player_1.max_health, player_1.health + 20)  # Increase health
 
         # Handle boss spawning
-        if player_1.score >= 100000 and not boss_spawned and not enemy_spawner.boss_active:
+        if player_1.score >= 10000 and not boss_spawned and not enemy_spawner.boss_active:
             boss_x = win_width // 2 - 62.5  # Half of the boss width
-            boss_y = 50  # Starting y-coordinate for the boss
+            boss_y = 250  # Starting y-coordinate for the boss
             boss = Boss(boss_x, boss_y, boss_bullet, player_1)
             boss_spawned = True
             enemy_spawner.set_boss_active(True)  # Mark the boss as active
 
         # Boss logic
         if boss_spawned:
-            boss.move()
-            boss.shoot()
-            boss.draw(win)
-            if boss.health <= 0:  # Boss defeated
-                boss_spawned = False
-                enemy_spawner.set_boss_active(False)  # Mark the boss as not active
-                print("Boss defeated!")
-                boss = None  # Cleanup the boss object
-                
-            for bullet in list(player_1.bullets):  # Use a list copy to safely modify the bullets list
-                if bullet.get_rect().colliderect(boss.get_rect()):
-                    boss.take_damage(bullet.damage)  # Assume this method deducts health from the boss
-                    player_1.bullets.remove(bullet)  # Remove the bullet on collision
-                        
-            boss.move()
-            boss.shoot()
-            boss.move_bullets()
+            boss.update()
             boss.draw(win)
             
-            if boss.health <= 0:  # Moved the condition inside the boss_spawned block
-                print("Boss defeated!")
-                boss_spawned = False
-                boss = None  # Cleanup the boss object
-                enemy_spawner.boss_is_defeated()  # Set boss as defeated, preventing it from respawning
+            for bullet in list(boss.bullets):  # Iterate over the boss's bullets
+                bullet.move()
+                if bullet.collide(player_1):
+                    player_1.take_damage(bullet.damage)
+                    boss.bullets.remove(bullet)
+                elif bullet.y < 0 or bullet.x < 0 or bullet.x > win_width or bullet.y > win_height:
+                    boss.bullets.remove(bullet)
+
+            if boss.health <= 0:  # Boss defeated
+                if boss_defeated_time is None:
+                    boss_defeated_time = pygame.time.get_ticks()  # Set the defeat time
+                else:
+                    current_time = pygame.time.get_ticks()
+                    if current_time - boss_defeated_time >= 2000:  # 2 seconds delay
+                        boss_spawned = False
+                        enemy_spawner.set_boss_active(False)  # Mark the boss as not active
+                        display_victory_screen()  # Call the function to display the victory screen
+                        boss = None  # Cleanup the boss object
+
+            for bullet in list(player_1.bullets):  # Use a list copy to safely modify the bullets list
+                if bullet.get_rect().colliderect(boss.get_rect()):
+                    if boss.take_damage(bullet.damage):  # Check if boss is defeated and trigger explosion
+                        explosion_animations.append(ExplosionAnimation(boss.x, boss.y))
+                    player_1.bullets.remove(bullet)  # Remove the bullet on collision
 
         for enemy in enemies:
             enemy.move()
@@ -666,22 +716,12 @@ if welcome_screen():
             
         # Move health items
         health_item.y += health_item.vel
-
-        # Check collision
-        player_rect = pygame.Rect(player_1.x, player_1.y, player_1.width, player_1.height)
-        if health_item.check_collision(player_rect):
-            player_1.health = min(player_1.max_health, player_1.health + 20)
-            health_item.active = False  # Disable the health item after collision
-        
-        health_item.draw(win)
         
         enemies_to_remove = []
         bullets_to_remove = []
 
-
         destroyed_enemy_ids = set()  # Set to store the IDs of destroyed enemies
     
-        
         for explosion_animation in explosion_animations:
             explosion_animation.animate(win)
             
@@ -733,6 +773,7 @@ if welcome_screen():
                     
         update_and_display_stats(player_1)
         pygame.display.update()
+        clock.tick(fps)
         redraw_game_window(player_1, enemies, background)
         
 pygame.quit()
