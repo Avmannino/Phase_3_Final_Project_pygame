@@ -19,7 +19,6 @@ health_bar_image = pygame.image.load('assets/health_bar.png').convert_alpha()
 game_over_bg = pygame.image.load('assets/gameover.png')
 restart_button = pygame.image.load('assets/restart_button.png')  # Adjust path as needed
 
-
 player_width = 75
 player_health = 100
 max_player_health = 100
@@ -30,8 +29,6 @@ game_over_font = pygame.font.SysFont(None, 95)
 leaderboard_font = pygame.font.SysFont(None, 50)
 stats_font = pygame.font.SysFont(None, 65)
 
-
-
 char = pygame.image.load('assets/player_img1.png')
 bullet_sides = pygame.image.load('assets/purple_sides.png')
 bullet_middle = pygame.image.load('assets/orange_middle.png')
@@ -41,47 +38,7 @@ enemy_ship = pygame.image.load('assets/enemy_ship1.png')
 boss_image = pygame.image.load('assets/boss_one.png') 
 boss_bullet = pygame.image.load('assets/boss_bullet.png') 
 
-
-
-
 clock = pygame.time.Clock()
-
-# Class definition for HighScores
-class HighScores:
-    def __init__(self):
-        self.scores = []
-        self.load_scores()
-
-    def load_scores(self):
-        if os.path.exists('hi_scores.txt'):
-            with open('hi_scores.txt', 'r') as file:
-                for line in file:
-                    name, score, time_duration = line.strip().split(',')
-                    self.scores.append({'name': name, 'score': int(score), 'time_duration': time_duration})
-
-    def save_scores(self):
-        with open('hi_scores.txt', 'w') as file:
-            for score in self.scores:
-                file.write(f"{score['name']},{score['score']},{score['time_duration']}\n")
-
-    def add_score(self, name, score, time_duration):
-        if not self.scores or score > self.scores[0]['score']:
-            self.scores = [{'name': name, 'score': score, 'time_duration': time_duration}]
-            self.save_scores()  # Save the new highest score
-
-    def get_highest_score(self):
-        if self.scores:
-            return max(score['score'] for score in self.scores)
-        else:
-            return 0
-
-    def display_scores(self):
-        print("\nHIGH SCORES:")
-        for idx, score in enumerate(self.scores, start=1):
-            print(f"{idx}., {score['name']}- Name: {score['name']} - Score: {score['score']}, Time: {score['time_duration']}")
-
-            
-high_score_instance = HighScores()
 
 class ScrollingBackground:
     def __init__(self, images):
@@ -141,8 +98,6 @@ class Bullet:
         target_rect = pygame.Rect(target.x, target.y, target.width, target.height)
         return bullet_rect.colliderect(target_rect)
 
-
-
 class Player:
     def __init__(self, x, y, width, height):
         self.x = x
@@ -160,7 +115,6 @@ class Player:
         self.max_health = 100
         self.direction = "standing"
         self.game_over = False  # New variable to track game over state
-        
         
     def draw(self, win):
         if self.direction == "left":
@@ -220,37 +174,25 @@ class Player:
             self.health = 0
             self.display_game_over()
             self.game_over = True  # Ensuring game over is set to True
-            # Ensure high score is recorded when health drops to zero
-            current_time = pygame.time.get_ticks() - start_time
-            minutes = current_time // 60000
-            seconds = (current_time // 1000) % 60
-            milliseconds = current_time % 1000
-            high_score_instance.add_score("PlayerName", self.score, f"{minutes:02}:{seconds:02}:{milliseconds:03}")
-            
 
     def display_game_over(self):
-            
-            # Draw the background image
+        
             win.blit(game_over_bg, (0, 0))
 
             # Adjust the position and size of the restart button
             restart_button_rect = pygame.Rect(win_width // 2 - 135, win_height // 2 + 280, 320, 80)
-
-            # Adjust the color and style of the restart button
-            restart_button_color = (204, 204, 0, 80)  # Red color
-            border_radius = 40  # Adjust the border radius as needed
+            
+            restart_button_color = (204, 204, 0, 80)  
+            border_radius = 40  
             pygame.draw.rect(win, restart_button_color, restart_button_rect, border_radius=border_radius)
 
-            # Render text
             font = pygame.font.Font(None, 36) 
             text_surface = font.render("Try Again?", True, (0, 0, 0))  
             text_rect = text_surface.get_rect(center=restart_button_rect.center)
 
-            # Blit text onto the button surface
             win.blit(text_surface, text_rect)
 
             pygame.display.flip()
-
 
             waiting_for_input = True
             while waiting_for_input:
@@ -263,7 +205,6 @@ class Player:
                             # Restart the whole program
                             python = sys.executable
                             os.execl(python, python, *sys.argv)
-
 
 def restart_game(player):
     player.game_over = False
@@ -280,42 +221,8 @@ def restart_game(player):
     player.max_health = 100
     player.direction = "standing"
 
-    # Add the player's score to the high scores only when health reaches 0
-    if player.health <= 0:
-        current_time = pygame.time.get_ticks() - start_time
-        minutes = current_time // 60000
-        seconds = (current_time // 1000) % 60
-        milliseconds = current_time % 1000
-        high_score_instance.add_score(player_name, player.score, f"{minutes:02}:{seconds:02}:{milliseconds:02}")
-
-    # Clear the input area with a solid color
-    pygame.draw.rect(win, (0, 0, 0), (win_width // 2 - input_text.get_width() // 2, win_height // 4 - 50, input_text.get_width(), input_text.get_height()))
-
-    input_text = FONT.render(player_name, True, (255, 255, 255))
-    win.blit(input_text, (win_width // 2 - input_text.get_width() // 2, win_height // 4 - 20))
-
     clock.tick(60)
-    pygame.display.update()
-
-    # Define a starting x-coordinate for the leftmost column
-    start_x = win_width // 2 - 100  # Adjust this value as needed
-    start_y = 50  # Adjust this value as needed
-
-    for idx, score in enumerate(high_score_instance.score[:1], start=1):
-        score_text = leaderboard_font.render(f"{idx}. {score['name']}", True, (255, 255, 255))
-        score_value_text = leaderboard_font.render(f"Score: {score['score']}", True, (255, 255, 255))
-        time_value_text = leaderboard_font.render(f"Time: {score['time_duration']}", True, (255, 255, 255))
-        
-        # Calculate the y-coordinate for the current row
-        row_y = start_y + (idx - 1) * 70  # Adjust the vertical spacing between rows
-        
-        win.blit(score_text, (start_x, row_y))
-        win.blit(score_value_text, (start_x + 50, row_y)) 
-        win.blit(time_value_text, (start_x + 300, row_y))
-    
-
-
-    clock.tick(60)     
+    pygame.display.update()   
 
     pygame.quit()
     sys.exit()
@@ -327,7 +234,7 @@ class HealthItem:
         self.image = image
         self.width = self.image.get_width()
         self.height = self.image.get_height()
-        self.vel = 2
+        self.vel = 3
         self.active = True
 
     def spawn(self):
@@ -341,7 +248,6 @@ class HealthItem:
 
     def check_collision(self, player_rect):
         return player_rect.colliderect(pygame.Rect(self.x, self.y, self.width, self.height))
-
 
 class Enemy:
     def __init__(self, x, y, width, height, bullet_image, player):
@@ -374,9 +280,8 @@ class Enemy:
             else:
                 self.y = 0
                 self.x = random.randint(0, win_width - 100)
-                self.reverse_timer = pygame.time.get_ticks()  # Reset the timer when reappearing
+                self.reverse_timer = pygame.time.get_ticks() 
         else:
-            # Move in reverse after the first 5 seconds
             self.y -= self.vel
             
     def shoot(self):
@@ -388,7 +293,6 @@ class Enemy:
             self.shoot_counter = self.shoot_cooldown
 
     def update(self):
-        # Check if 5 seconds have passed and set the reverse_direction flag
         current_time = pygame.time.get_ticks()
         if current_time - self.reverse_timer > self.reverse_delay:
             self.reverse_direction = True
@@ -422,8 +326,8 @@ class Boss:
     def __init__(self, x, y, boss_bullet, target):
         self.x = x
         self.y = y
-        self.width = 115  # Set width to 125
-        self.height = 115  # Set height to 125
+        self.width = 115  
+        self.height = 115  
         self.boss_image = pygame.transform.scale(pygame.image.load('assets/boss_one.png'), (self.width, self.height))
         self.vel = 5
         self.health = 250
@@ -437,9 +341,9 @@ class Boss:
         self.moving_right = True
 
     def draw_health_bar(self, win):
-        # Calculate health bar width based on current health
         health_bar_width = int((self.health / self.max_health) * self.width)
         health_bar_height = 20
+        
         # Draw the health bar just above the boss
         pygame.draw.rect(win, (255, 0, 0), (self.x, self.y - 20, self.width, health_bar_height))
         pygame.draw.rect(win, (0, 255, 0), (self.x, self.y - 20, health_bar_width, health_bar_height))
@@ -447,11 +351,11 @@ class Boss:
     def move(self):
         if self.moving_right:
             self.x += self.vel
-            if self.x + self.width > win_width:  # Boss reaches right edge
+            if self.x + self.width > win_width: 
                 self.moving_right = False
         else:
             self.x -= self.vel
-            if self.x < 0:  # Boss reaches left edge
+            if self.x < 0:
                 self.moving_right = True
 
     def shoot(self):
@@ -475,11 +379,9 @@ class Boss:
             
     def get_rect(self):
         return pygame.Rect(self.x, self.y, self.width, self.height)
-
-
-
+    
     def move_bullets(self):
-        for bullet in list(self.bullets):  # Use list to safely remove items while iterating
+        for bullet in list(self.bullets):  
             bullet.move()
             if bullet.collide(self.target):
                 self.target.take_damage(bullet.damage)
@@ -492,36 +394,30 @@ class Boss:
     def take_damage(self, damage):
         self.health -= damage
         if self.health <= 0:
-            # Boss defeated, implement defeat logic here
             pass
 
     def draw(self, win):
         win.blit(self.boss_image, (self.x, self.y))
         self.draw_health_bar(win)
 
-        
-        
-
 class EnemySpawner:
+    
     def __init__(self, cooldown):
         self.cooldown = cooldown
         self.counter = 0
-        self.boss_defeated = False
+        self.boss_active = False  
 
     def spawn_enemy(self):
-        if self.boss_defeated:
-            return False
-
+        if self.boss_active:
+            return False 
         self.counter += 1
         if self.counter >= self.cooldown:
             self.counter = 0
             return True
         return False
 
-    def boss_is_defeated(self):
-        self.boss_defeated = True
-
-
+    def set_boss_active(self, is_active):
+        self.boss_active = is_active  
 
 class ExplosionAnimation:
     def __init__(self, x, y):
@@ -529,8 +425,8 @@ class ExplosionAnimation:
         self.y = y
         self.images = [pygame.image.load(f'backgrounds/Effect_BloodImpact_{i} (Custom).png') for i in range(1, 61)]
         self.current_frame = 0
-        self.animation_speed = 1  # Adjust the speed of the animation
-        self.loop_count = 0  # Number of loops completed
+        self.animation_speed = 1 
+        self.loop_count = 0  
 
     def animate(self, win):
         if self.current_frame < len(self.images):
@@ -544,7 +440,6 @@ class ExplosionAnimation:
             if self.loop_count == 20:
                 self.current_frame = len(self.images)  # Set to a frame beyond the last frame to mark completion
     
-
 def draw_player_health_bar(player_width):
     health_percentage = player_1.health / player_1.max_health
     health_bar_width = int(2.48 * health_percentage * player_width)
@@ -552,7 +447,7 @@ def draw_player_health_bar(player_width):
     health_bar_x = 158  # Set health bar x-position to a fixed value (left side)
     health_bar_y = win_height - 946 - health_bar_height
 
-    # Choose color based on health percentage
+    # Color based on health percentage
     if health_percentage > 0.7:
         health_color = (0, 255, 0)  # Green when health is above 70%
     elif health_percentage > 0.3:
@@ -562,24 +457,15 @@ def draw_player_health_bar(player_width):
 
     pygame.draw.rect(win, health_color, (health_bar_x, health_bar_y, health_bar_width, health_bar_height))
     
-
     # Display the rounded health text
     health_text = FONT.render(f"{round(player_1.health, 1)} / {player_1.max_health}", 1, (0, 0, 255))
-    text_x = 185  # Adjust the position of the health text
-    text_y = win_height - 973  # Adjust the position of the health text
+    text_x = 185  
+    text_y = win_height - 973  
     win.blit(health_text, (text_x, text_y))
 
     if player_1.health <= 0 and not player_1.game_over:  # Check if the player is not already in game over state
         player_1.display_game_over()
-        player_1.game_over = True  # Set game over state to True
-
-        # Add the player's score to the high scores only when health reaches 0
-        current_time = pygame.time.get_ticks() - start_time
-        minutes = current_time // 60000
-        seconds = (current_time // 1000) % 60
-        milliseconds = current_time % 1000
-        high_score_instance.add_score(player_name, player_1.score, f"{minutes:02}:{seconds:02}:{milliseconds:02}")
-
+        player_1.game_over = True  # Set game over state to Tru
 
 def update_and_display_stats(player):
     # Update and display the health bar
@@ -618,7 +504,6 @@ def welcome_screen():
     loop_counter_bg2 = 0
     first_loop_completed = False  # Variable to track the first loop of background_animation2
     
-
     while True:
         entering_name = True
         for event in pygame.event.get():
@@ -630,50 +515,42 @@ def welcome_screen():
                     start_time = pygame.time.get_ticks()  # Set the start time when the game starts
                     return True  # Return True to indicate that the game should start
              
-        # # Display the animated background
         win.blit(background_animation[current_frame], (0, 0))
 
-        # Check if one loop is completed for background_animation2
         if first_loop_completed:
-            win.blit(background_animation2[29], (200, 350))  # Render the picture titled "30" after the first loop
+            win.blit(background_animation2[29], (200, 350))  
         else:
             win.blit(background_animation2[current_frame_bg2], (200, 350))
 
-        # Update the frame for animation
+     
         current_frame = (current_frame + 1) % len(background_animation)
 
-        # Update the frame for background_animation2
+     
         current_frame_bg2 = (current_frame_bg2 + 1) % len(background_animation2)
         loop_counter_bg2 += 1
 
-        # Check if one loop is completed
+
         if loop_counter_bg2 >= len(background_animation2):
-            loop_counter_bg2 = 0  # Reset the loop counter
-            first_loop_completed = True  # Set the flag to indicate the first loop is completed
+            loop_counter_bg2 = 0  
+            first_loop_completed = True  
 
         # Draw the start button
         button_rect = start_button.get_rect(center=(win_width // 2, win_height // 1.9))
         win.blit(start_button, button_rect)
         
-        # button_rect = exit_button.get_rect(center=(win_width // 2, win_height // 1.85))
-        # win.blit(exit_button, button_rect)
-        
         pygame.display.flip()
         pygame.time.Clock().tick(30)
 
-# Instantiate an EnemySpawner with a specific cooldown value
+# Instantiate an EnemySpawner with a cooldown value
 enemy_spawner = EnemySpawner(cooldown=150)
 
 health_item_image = pygame.image.load('assets/health_item.png')
 health_item = HealthItem(win_width / 2, win_height / 2, health_item_image)
 
-
-
-
-
 explosion_animations = []  # List to store explosion animations
 
 # Call the welcome_screen function before entering the main game loop
+
 if welcome_screen():
     # Main loop
     player_1 = Player(win_width // 2 - player_width // 2, win_height - player_width - 150, 100, 100)
@@ -682,7 +559,10 @@ if welcome_screen():
     enemy_spawner = EnemySpawner(cooldown=150)
     start_time = pygame.time.get_ticks()  # Set the start time when the game starts
     spawn_timer = 0
-    spawn_interval = 15000  # Time in milliseconds between spawns
+    spawn_interval = 7000  # Time in milliseconds between spawns
+    health_item_spawn_timer = 0
+    health_item_spawn_interval = 10000  # 10 seconds interval
+
     
     # Initialize boss_spawned
     boss_spawned = False
@@ -728,26 +608,40 @@ if welcome_screen():
         background.scroll()
 
         # Handle enemy spawning
-        if enemy_spawner.spawn_enemy() and player_1.score < 10000:  # Keep spawning regular enemies until score reaches 10,000
+        if enemy_spawner.spawn_enemy():
             enemy_x = random.randint(0, win_width - 100)
             enemy_y = 0
             new_enemy = Enemy(enemy_x, enemy_y, 100, 100, bullet_missile, player_1)
             enemies.append(new_enemy)
+            
+        current_time = pygame.time.get_ticks()
+
+        # Handle HealthItem spawning
+        if current_time - health_item_spawn_timer > health_item_spawn_interval:
+            if not health_item.active:  # Check if there is no active health item
+                health_item.spawn()  # Spawn the health item
+                health_item_spawn_timer = current_time  # Reset the timer
+
 
         # Handle boss spawning
-        if player_1.score >= 10000 and not boss_spawned and not enemy_spawner.boss_defeated:
-            # Calculate the boss's starting position so it appears centered
-            # Calculate the initial x-coordinate to center the boss
+        if player_1.score >= 100000 and not boss_spawned and not enemy_spawner.boss_active:
             boss_x = win_width // 2 - 62.5  # Half of the boss width
-            boss_y = 50  # Arbitrary y-coordinate for spawning
-
-            # Create the boss instance
+            boss_y = 50  # Starting y-coordinate for the boss
             boss = Boss(boss_x, boss_y, boss_bullet, player_1)
             boss_spawned = True
-            
+            enemy_spawner.set_boss_active(True)  # Mark the boss as active
+
+        # Boss logic
         if boss_spawned:
-            boss_rect = pygame.Rect(boss.x, boss.y, boss.width, boss.height)  # Create a rectangle for the boss
-            
+            boss.move()
+            boss.shoot()
+            boss.draw(win)
+            if boss.health <= 0:  # Boss defeated
+                boss_spawned = False
+                enemy_spawner.set_boss_active(False)  # Mark the boss as not active
+                print("Boss defeated!")
+                boss = None  # Cleanup the boss object
+                
             for bullet in list(player_1.bullets):  # Use a list copy to safely modify the bullets list
                 if bullet.get_rect().colliderect(boss.get_rect()):
                     boss.take_damage(bullet.damage)  # Assume this method deducts health from the boss
@@ -792,10 +686,7 @@ if welcome_screen():
             explosion_animation.animate(win)
             
         player_1.draw(win)
-            
-            
-        
-        # Inside the main loop
+
         for enemy in enemies:
             enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
 
@@ -818,7 +709,6 @@ if welcome_screen():
                         bullets_to_remove.append(bullet)
                         print(f"Enemy Health: {enemy.health}")
 
-                        # Handle the case where the enemy health goes below 0
                         if enemy.health <= 0 and enemy not in destroyed_enemy_ids:
                             destroyed_enemy_ids.add(enemy)
                             enemies_to_remove.append(enemy)
@@ -826,58 +716,21 @@ if welcome_screen():
                             # Create an explosion animation at the enemy's coordinates
                             explosion_animations.append(ExplosionAnimation(enemy.x, enemy.y))
                             
-        # Inside the main game loop
         explosion_animations = [explosion for explosion in explosion_animations if explosion.current_frame < len(explosion.images)]
 
-     
         player_rect = pygame.Rect(player_1.x, player_1.y, player_1.width, player_1.height)
         if health_item.check_collision(player_rect):
             player_1.health = min(player_1.max_health, player_1.health + 20)
             health_item.x = -100  # Move it offscreen or respawn as needed
 
-
         player_1.score += 5000 * len(destroyed_enemy_ids)
 
         draw_player_health_bar(player_width)
         
-
-
         player_1.bullets = [bullet for bullet in player_1.bullets if bullet not in bullets_to_remove]
         enemies = [enemy for enemy in enemies if enemy not in enemies_to_remove]
         enemies = [enemy for enemy in enemies if enemy.health > 0]
-        
-        if not run and entering_name:
-            # Display the score and time only on the game over screen
-            current_time = pygame.time.get_ticks() - start_time
-            minutes = current_time // 60000
-            seconds = (current_time // 1000) % 60
-            milliseconds = current_time % 1000
-            score_time_text = FONT.render(f"Score: {player_1.score:,}    Time: {minutes:02}:{seconds:02}:{milliseconds:03}", True, (255, 255, 255))
-            text_x = win_width // 2 - score_time_text.get_width() // 2
-            text_y = win_height // 3
-            win.blit(score_time_text, (text_x, text_y))
-        
-        while run and entering_name:
-            entering_name = True
-            player_name = ""
-            
-            for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        run = False
-                        pygame.quit()
-                        sys.exit()
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_RETURN:
-                            entering_name = False
-                        elif event.key == pygame.K_BACKSPACE:
-                            player_name = player_name[:-1]
-                        else:
-                            player_name += event.unicode
-            
-           
-            clock.tick(60)
-            
-        
+                    
         update_and_display_stats(player_1)
         pygame.display.update()
         redraw_game_window(player_1, enemies, background)
